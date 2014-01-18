@@ -1,8 +1,7 @@
 import curses, curses.textpad
-import time, math
+import time, math, sys, textwrap, threading
 import serverio
 from definitions import *
-import textwrap
 
 #window object, global because curses
 window = None
@@ -10,18 +9,19 @@ logged_in_user = None
 
 #these are dictionaries of data that would normally be populated by server
 #because this is GUI, putting it here.
-online_friends = {}
+online_friends = []
 users = {}
 posts = {}
 comments = {}
 
 scroll_y=0
-chat_y=0
+chat_scroll_y=0
+chat_select_y =0
+chat_height = 0
+focus = ""
 
-
-def get_username(post):
-	return users[post.creator_uid].name
-
+chat_focus = ">Chat Mode"
+feed_focus = ">Feed Mode"
 
 def startup():
 	curses.noecho()
@@ -37,11 +37,16 @@ def startup():
 	#curses.curs_set(1)
 
 def login():
-	global logged_in_user, users
+	global logged_in_user, users, online_friends
 	logged_in_user = User(0,"Max",18,"Toronto",["maxwell.huang-hobbs.com"],["FUCKING NOTHING"],[])
 	users[0] = logged_in_user
 	for friend in serverio.get_friends(logged_in_user):
 		users[friend.uid] = friend
+
+
+	online_friends = serverio.get_online_friends(logged_in_user)
+	#checker=ContinuousChecker()
+	#checker.start()
 
 	update_posts(0)
 
@@ -54,9 +59,11 @@ def update_posts(fish_depth):
 				if not cid in comments.keys():
 					comments[cid] = serverio.get_comment_by_id(logged_in_user, cid)
 
+def get_username(post):
+	return users[post.creator_uid].name
 
 def printblock(x, y, width, header, body):
-	disp_width = width - 5
+	disp_width = width - 6
 	by = y+len(textwrap.wrap(body, disp_width))+3;
 
 	if( y>=0 and by< window.getmaxyx()[0]-1):
@@ -70,12 +77,15 @@ def printblock(x, y, width, header, body):
 	return by
 
 
-def redraw_both( return_chat):
+
+def redraw_both(return_chat = True):
 	window.clear()
+	c = redraw_chat(chat_scroll_y)
+	s = redraw_scroll(scroll_y)
+	window.addstr(window.getmaxyx()[0]-1 ,0 , focus)
+	window.clrtoeol()
 	window.refresh()
-	chat = redraw_chat(chat_y)
-	scroll = redraw_scroll(scroll_y)
-	return chat if return_chat else scroll
+	return c if return_chat else s
 
 def redraw_scroll(scrolly):
 	#redraw scroll
@@ -95,21 +105,43 @@ def redraw_scroll(scrolly):
 					get_username( comments[post.comment_ids[c]] ),
 					comments[post.comment_ids[c]].text_content) +1 +scrolly
 
-	window.refresh()
 	return count_y
 
-def main_interface():
-	redraw_both(True)
-	while(True):
-		scroll_interface()
-		chat_interface()
-		control_interface()
-
 def redraw_chat(chaty):
+
+	curses.textpad.rectangle(window, 0, window.getmaxyx()[1]-28, 2, window.getmaxyx()[1]-1)
 	curses.textpad.rectangle(window, 0, window.getmaxyx()[1]-28, 2, window.getmaxyx()[1]-1)
 	window.addstr(1, window.getmaxyx()[1]-27, "Online Friends")
 
 	curses.textpad.rectangle(window, 3, window.getmaxyx()[1]-28, window.getmaxyx()[0]-2, window.getmaxyx()[1]-1)
+
+	i=0
+	for friendid in online_friends[chat_scroll_y:min(len(online_friends),chat_scroll_y+chat_height)]:
+		i+=1
+		friend = users[friendid]
+		window.addstr(
+			3+i, window.getmaxyx()[1]-25,
+			(friend.name[0:min(len(friend.name),15)] +
+				("..." if  len(friend.name)>18 else (friend.name[-3:-1] if len(friend.name)>15 else "") ) + "(%04d)"%(friend.uid))
+		)
+
+	if(focus == chat_focus):
+		window.addstr(4+chat_select_y-chat_scroll_y, window.getmaxyx()[1]-27, ">")
+
+
+	return chaty
+
+
+def main_interface():
+	window.clear()
+	redraw_both()
+	window.refresh()
+	global focus
+	while(True):
+		focus=feed_focus
+		scroll_interface()
+		focus=chat_focus
+		chat_interface()
 
 def scroll_interface():
 	global scroll_y
@@ -122,25 +154,95 @@ def scroll_interface():
 		if (s == "j" and scroll_y>0):
 			scroll_y -= 1
 			maxheight = redraw_both(False)
+		if s == "	":
+			break
+		if s=="\n":
+			pass #TODO make post
+		if s==":":
+			command_interface()
 
 def chat_interface():
-	global chat_y
-	window.clear()
-	curses.textpad.rectangle(window, y, x, by, x + width)
-	window.refresh()
+	global chat_scroll_y, chat_select_y
+	redraw_both(True)
 	maxheight = redraw_both(True)
 	while True:
 		s = window.getkey()
-		if (s == "k" and chat_y<=maxheight-window.getmaxyx()[0]):
-			chat_y += 1
-			maxheight = redraw_both(True)
-		if (s == "j" and chat_y>0):
-			chat_y -= 1
-			maxheight = redraw_both(True)
+		if s == "j" and chat_select_y>0:
+			chat_select_y-=1
+		if s == "k":
+			chat_select_y+=1
+		elif s == "	":
+			break
+		elif s=="\n":
+			pass #TODO chat invites
+		elif s==":":
+			command_interface()
+
+		if(chat_select_y>= len( online_friends)):
+			chat_select_y = len(online_friends)-1
+
+		if ( chat_select_y>=chat_scroll_y + chat_height):
+			chat_scroll_y += 1
+		elif (chat_select_y<chat_scroll_y):
+			chat_scroll_y -= 1
+
+		maxheight = redraw_both(True)
+
+def command_interface():
+	window.addstr(window.getmaxyx()[0]-1 ,0 , ":")
+	window.refresh()
+	window.clrtoeol()
+	command = ""
+	while True:
+		s = window.getkey()
+		if s == "	":
+			break
+		elif s == "\n":
+			handle_command(command)
+			command = ""
+		elif s == "\b" and len(command)>=1:
+			command = command[0:-1]
+		elif s==":":
+			command=""
+		else:
+			command = command + s
+		window.addstr(window.getmaxyx()[0]-1 ,1 , command)
+		window.clrtoeol()
+		window.refresh()
+	redraw_both()
+	window.refresh()
+
+
+
+
+
+def handle_command(command):
+	command = command.split(" ")
+	if command[0] == "quit":
+		curses.endwin()
+		sys.exit(0)
+	elif command[0] == "chat":
+		try:
+		    int(command[1])
+		    if(int(command[1]) in online_friends):
+		    	personal_chat_interface(command[1])
+		    else:
+		    	window.addstr(window.getmaxyx()[0]-2 ,1 , "user with id %i not online"%(command[1]))
+		except ValueError:
+			for friend in [users[x] for x in online_friends]:
+				if(command[1] == friend.name):
+					personal_chat_interface(friend.uid)
+					return
+			window.addstr(window.getmaxyx()[0]-2 ,1 , "user %s not online"%(command[1]))
+	elif command[0] == "post":
+		make_post_interface()
+	else:
+		window.addstr(window.getmaxyx()[0]-2 ,1 , "Unknown command '%s'. type 'list' for a list of valid commands"%(command[0]))
 
 
 if __name__ == "__main__":
 	window = curses.initscr()
+	chat_height = window.getmaxyx()[0]-7
 
 	startup()
 	login()
