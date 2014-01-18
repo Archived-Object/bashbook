@@ -3,13 +3,13 @@ from definitions import *
 
 def get_friends(user_self):
 	return [
-		User(1,"Will",19,"Boston",["williamsaulnier.com"],[],[]),
-		User(2,"Jeff",19,"New York",["jefftao.com"],[],[]),
+		User(1,"Will Saulnier",19,"Boston",["williamsaulnier.com"],[],[]),
+		User(2,"Jeffrey Tao",19,"New York",["jefftao.com"],[],[]),
 		User(3,"Longname Jones Mcquay the IIIrd",86,"New Brunswick",[],[],[]),
 		]
 
 def get_online_friends(user_self):
-	return [1,2,3,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1]
+	return [1,2,3,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,2,2,2,3,1]
 
 def get_recent_posts(user_self, age_fish):
 	return [

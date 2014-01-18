@@ -134,8 +134,8 @@ def redraw_chat(chaty):
 		friend = users[friendid]
 		window.addstr(
 			3+i, window.getmaxyx()[1]-25,
-			(friend.name[0:min(len(friend.name),15)] +
-				("..." if  len(friend.name)>18 else (friend.name[-3:-1] if len(friend.name)>15 else "") ) + "(%04d)"%(friend.uid))
+			("(%04d)"%(friend.uid) +" "+ friend.name[0:min(len(friend.name),14)] +
+				("..." if  len(friend.name)>14 else (friend.name[-3:-1] if len(friend.name)>14 else "") ))
 		)
 
 	if(focus == chat_focus):
