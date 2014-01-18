@@ -3,6 +3,13 @@ Hastily constructed in-terminal social network written in python and (hopefully)
 
 Made for M-Hacks
 
+Scrolling is mapped to j/k for scrolling up/down.
+To make a post, press enter when in scroll mode (not implemented)
+to enter a conversation, press enter when in chat mode (not implemented)
+to go to the inner console line, type :
+
+to exit the program, go to the inner console and type :quit
+
 
 ##Users:
  - Avatar 
