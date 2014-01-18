@@ -1,4 +1,3 @@
-
 class User():
 	def __init__(self, uid, name, age, location, websites, interests, friends):
 		(	self.uid, self.name, self.age, self.location,

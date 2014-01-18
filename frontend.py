@@ -23,6 +23,7 @@ focus = ""
 chat_focus = ">Chat Mode"
 feed_focus = ">Feed Mode"
 
+#this function does the splash scren, will be used again when we actually need to connect to a server
 def startup():
 	curses.noecho()
 	curses.curs_set(0)
@@ -36,20 +37,23 @@ def startup():
 
 	#curses.curs_set(1)
 
+#fakes a login - grabs information about buddies, currently online friends
 def login():
 	global logged_in_user, users, online_friends
-	logged_in_user = User(0,"Max",18,"Toronto",["maxwell.huang-hobbs.com"],["FUCKING NOTHING"],[])
+	logged_in_user = User(
+		0,"Max",18,"Toronto",
+		["maxwell.huang-hobbs.com"],["FUCKING NOTHING"],[])
 	users[0] = logged_in_user
 	for friend in serverio.get_friends(logged_in_user):
 		users[friend.uid] = friend
 
-
 	online_friends = serverio.get_online_friends(logged_in_user)
-	#checker=ContinuousChecker()
+	#checker=ContinuousChecker() rand into trouble with live-updating threads. Is curses not threadsafe? ;_;
 	#checker.start()
 
 	update_posts(0)
 
+#pulls the most recent set of posts, from age fish-depth and before
 def update_posts(fish_depth):
 	for post in serverio.get_recent_posts(logged_in_user, fish_depth):
 		if(post.post_id not in posts.keys()):
@@ -59,9 +63,12 @@ def update_posts(fish_depth):
 				if not cid in comments.keys():
 					comments[cid] = serverio.get_comment_by_id(logged_in_user, cid)
 
+#gets the username of the person who made a post or comment
 def get_username(post):
 	return users[post.creator_uid].name
 
+# prints a neat block of text with a seperate section for
+#the body
 def printblock(x, y, width, header, body):
 	disp_width = width - 6
 	by = y+len(textwrap.wrap(body, disp_width))+3;
@@ -77,7 +84,8 @@ def printblock(x, y, width, header, body):
 	return by
 
 
-
+#redraws the scroll (think newsfeed) and chat areas, then
+#refreshes the result to console window (double-buffered)
 def redraw_both(return_chat = True):
 	window.clear()
 	c = redraw_chat(chat_scroll_y)
@@ -87,6 +95,9 @@ def redraw_both(return_chat = True):
 	window.refresh()
 	return c if return_chat else s
 
+#redraws the scroll, offset by scrolly columns.
+#Does not draw boxes that are partially off screen. (abusable?)
+#does not update the console window
 def redraw_scroll(scrolly):
 	#redraw scroll
 	post_x  = 3
@@ -107,6 +118,8 @@ def redraw_scroll(scrolly):
 
 	return count_y
 
+#redraws the chat section.
+#does not update the console window
 def redraw_chat(chaty):
 
 	curses.textpad.rectangle(window, 0, window.getmaxyx()[1]-28, 2, window.getmaxyx()[1]-1)
@@ -131,7 +144,8 @@ def redraw_chat(chaty):
 
 	return chaty
 
-
+#switches between scroll_interface and chat_interface methods,
+#and changes the value of "focus" (the thing in the bottom left)
 def main_interface():
 	window.clear()
 	redraw_both()
@@ -143,6 +157,7 @@ def main_interface():
 		focus=chat_focus
 		chat_interface()
 
+#controls the behavior of the newsfeed section
 def scroll_interface():
 	global scroll_y
 	maxheight = redraw_both(False)
@@ -161,6 +176,7 @@ def scroll_interface():
 		if s==":":
 			command_interface()
 
+#controls the behavior of the chat section
 def chat_interface():
 	global chat_scroll_y, chat_select_y
 	redraw_both(True)
@@ -188,6 +204,9 @@ def chat_interface():
 
 		maxheight = redraw_both(True)
 
+#controls the behavior of the command section
+#this is the section where you type things in a 
+#console w/in console
 def command_interface():
 	window.addstr(window.getmaxyx()[0]-1 ,0 , ":")
 	window.refresh()
@@ -212,10 +231,7 @@ def command_interface():
 	redraw_both()
 	window.refresh()
 
-
-
-
-
+#handles the commands coming out of command_interface
 def handle_command(command):
 	command = command.split(" ")
 	if command[0] == "quit":
